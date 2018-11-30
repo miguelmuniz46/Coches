@@ -21,9 +21,9 @@ class Aparcamiento{
 public:
     Aparcamiento();
     void coche();
-    void liberarPlaza();
+    void liberarPlaza(int globalId);
     void monitor();
-    bool isOcupado();
+    bool isOcupado(Plaza_t plaza);
     void imprimirAscii();
     void imprimirCochesEsperando();
     void imprimirCochesOciosos();
@@ -34,6 +34,8 @@ public:
     void setStop(bool estado);
     bool getStop();
 };
+
+
 
 #endif
 

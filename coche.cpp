@@ -3,10 +3,6 @@
 #include "plazas.h"
 #include "mpi/mpi.h"
 
-#define OCIOSO 1
-#define ESPERANDO 2
-#define APARCADO 3
-
 //El semáforo tiene que estar en el main
 
 int recv_ID(){
@@ -20,6 +16,15 @@ int recv_ID(){
     return id;
 }
 
+int recv_estado(){
+    int estado = 0;
+    MPI_Comm parent;
+    MPI_Status status;
+    MPI_Comm_get_parent(&parent);
+
+    MPI_Recv(&estado, 1, MPI_INT, 0, MPI_ANY_TAG, parent, &status);
+}
+
 void send_MSG(char *msg, int size){
        MPI_Comm parent;
        MPI_Comm_get_parent(&parent);
@@ -28,7 +33,8 @@ void send_MSG(char *msg, int size){
 }
 
 int main(int argc, char **argv){
-    char *msg=new char[100];
+    char *msg_globalId=new char[100];
+    char *msg_estado=new char[100];
     int globalID;
     int rank = 0;
     int estado = OCIOSO;
@@ -38,11 +44,14 @@ int main(int argc, char **argv){
 
     globalID = recv_ID();
 
-    sprintf(msg, "soy el coche globalID %d, estado %d\n", globalID, estado);
-
     while(true){
-        send_MSG(msg, strlen(msg)+1);
-        //recibir mensaje
+        sprintf(msg_globalId, "%d", globalID);
+        sprintf(msg_estado, "%d", estado);
+
+        send_MSG(msg_globalId, strlen(msg_globalId)+1);
+        send_MSG(msg_estado, strlen(msg_estado)+1);
+
+        estado = recv_estado();
     }
 
     MPI_Finalize();

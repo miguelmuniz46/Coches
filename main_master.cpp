@@ -46,6 +46,7 @@ void recibe_msg(char **msg){
     }
 }
 
+
 Aparcamiento::Aparcamiento(){
     aparcamiento = (Plaza_t *)malloc(sizeof(Plaza_t)*PLAZAS);
 
@@ -59,29 +60,6 @@ Aparcamiento::Aparcamiento(){
     plazasLibres = PLAZAS;
 }
 /*
-
-void Aparcamiento::liberarPlaza(Thread_coche_t *coche){
-
-    omp_set_lock(&lock);
-    for (int j = 0; j < PLAZAS; j++) {
-        if (aparcamiento[j].thread_Id_coche == coche->thread_Id) {
-            aparcamiento[j].ocupado = false;
-            aparcamiento[j].thread_Id_coche = NULL;
-            aparcamiento[j].tiempo = 0.0;
-            coche->estado = OCIOSO;
-            plazasLibres++;
-        }
-    }
-    omp_unset_lock(&lock);
-}
-
-bool Aparcamiento::isOcupado(Plaza_t plaza){
-    if (plaza.ocupado) {
-        return true;
-    }
-
-    return false;
-}
 
 void Aparcamiento::monitor(Thread_coche_t *coches){
     while (true) {
@@ -105,48 +83,6 @@ void Aparcamiento::monitor(Thread_coche_t *coches){
 
         }
     }
-}
-
-void Aparcamiento::imprimirAscii(){
-    printf("\nAparcamiento:");
-    printf("\n_________________________\n");
-
-    for (int i = 0; i < PLAZAS; i++) {
-        if (i <= 4) {
-            if (aparcamiento[i].ocupado) {
-                if (aparcamiento[i].thread_Id_coche < 10) {
-                    printf("| 0%d ", aparcamiento[i].thread_Id_coche);
-                }
-                else {
-                    printf("| %d ", aparcamiento[i].thread_Id_coche);
-                }
-            }
-            else {
-                printf("|    ");
-            }
-        }
-        else {
-            if (i == 5) {
-                printf("|");
-                printf("\n");
-            }
-
-            if (aparcamiento[i].ocupado) {
-                if (aparcamiento[i].thread_Id_coche < 10) {
-                    printf("| 0%d ", aparcamiento[i].thread_Id_coche);
-                }
-                else {
-                    printf("| %d ", aparcamiento[i].thread_Id_coche);
-                }
-            }
-            else {
-                printf("|    ");
-            }
-        }
-    }
-    printf("|");
-
-    printf("\n_________________________\n");
 }
 
 void Aparcamiento::imprimirCochesEsperando(vector<MPI_Comm*> listaCoches){
@@ -242,73 +178,171 @@ bool Aparcamiento::getStop(){
 }
 */
 
-void coche(){
-    int *estado;
+
+void Aparcamiento::liberarPlaza(int globalId){
+    for (int j = 0; j < PLAZAS; j++) {
+        if (aparcamiento[j].thread_Id_coche == globalId) {
+            aparcamiento[j].ocupado = false;
+            aparcamiento[j].thread_Id_coche = 0;
+            plazasLibres++;
+        }
+    }
+}
+
+void Aparcamiento::monitor(){
+
+}
+
+bool Aparcamiento::isOcupado(Plaza_t plaza){
+    if (plaza.ocupado) {
+        return true;
+    }
+
+    return false;
+}
+
+void Aparcamiento::imprimirAscii(){
+
+    printf("\nAparcamiento:");
+    printf("\n_________________________\n");
+
+    for (int i = 0; i < PLAZAS; i++) {
+        if (i <= 4) {
+            if (aparcamiento[i].ocupado) {
+                if (aparcamiento[i].thread_Id_coche < 10) {
+                    printf("| 0%d ", aparcamiento[i].thread_Id_coche);
+                }
+                else {
+                    printf("| %d ", aparcamiento[i].thread_Id_coche);
+                }
+            }
+            else {
+                printf("|    ");
+            }
+        }
+        else {
+            if (i == 5) {
+                printf("|");
+                printf("\n");
+            }
+
+            if (aparcamiento[i].ocupado) {
+                if (aparcamiento[i].thread_Id_coche < 10) {
+                    printf("| 0%d ", aparcamiento[i].thread_Id_coche);
+                }
+                else {
+                    printf("| %d ", aparcamiento[i].thread_Id_coche);
+                }
+            }
+            else {
+                printf("|    ");
+            }
+        }
+    }
+    printf("|");
+
+    printf("\n_________________________\n");
+}
+
+void Aparcamiento::imprimirCochesEsperando(){
+    for(int i = 0; i < listaCochesEsperando.size(); i++){
+        printf("Coche: %d Estado: Esperando \n", listaCochesEsperando.at(i));
+    }
+}
+
+void Aparcamiento::imprimirCochesOciosos(){
+    for(int i = 0; i < listaCochesOciosos.size(); i++){
+        printf("Coche: %d Estado: Ocioso \n", listaCochesOciosos.at(i));
+    }
+}
+
+void Aparcamiento::freePlazas(){
+     free(aparcamiento);
+}
+
+void Aparcamiento::menu(){
+
+}
+
+
+void Aparcamiento::coche(){
+    int posicion = 0;
+    int estado = 0;
+    int globalId;
+
+    char *recv_estado;
+    char  *recv_globalId;
     srand(time(NULL));
     int random;
 
     while (true) {
+            estado = 0;
+            posicion = 0;
+
             //recibe el mensaje, en este caso el coche con el estado
-            recibe_msg(estado);
+            recibe_msg(&recv_globalId);
+            recibe_msg(&recv_estado);
+
+            globalId = atoi(recv_globalId);
+            estado = atoi(recv_estado);
+
             switch (estado) {
             case APARCADO:
-                random = rand() % (3000 + 1);
+                estado = OCIOSO;
+                random = rand() % (3 + 1);
                 sleep(random);
 
 
-                liberarPlaza(coche);
+                liberarPlaza(globalId);
+                listaCochesOciosos.push_back(globalId);
+                MPI_Send(&estado,1,MPI_INT,0,0,*(listaCoches[globalId]));
                 break;
             case OCIOSO:
-                random = rand() % (3000 + 1);
-                sleep(3000);
+                estado = ESPERANDO;
+                random = rand() % (3 + 1);
+                sleep(random);
 
 
                 //enviar a ese coche el mensaje, que será que ha cambiado de estado
+                for(int i = 0; i < listaCochesOciosos.size(); i++){
+                    if(listaCochesOciosos.at(i) == globalId){
+                        posicion = i;
+                        break;
+                    }
+                }
+
+                listaCochesOciosos.erase(listaCochesOciosos.begin()+posicion);
                 listaCochesEsperando.push_back(globalId);
+                MPI_Send(&estado,1,MPI_INT,0,0,*(listaCoches[globalId]));
                 break;
             case ESPERANDO:
+                estado = APARCADO;
+
                 if (plazasLibres > 0) {
                     for (int j = 0; j < PLAZAS; j++) {
                         if (!isOcupado(aparcamiento[j])) {
                             aparcamiento[j].ocupado = true;
                             aparcamiento[j].thread_Id_coche = globalId;
-                            //quitamos de la lista esperando
+
+                            for(int i = 0; i < listaCochesEsperando.size(); i++){
+                                if(listaCochesEsperando.at(i) == globalId){
+                                    posicion = i;
+                                    break;
+                                }
+                            }
+
+                            listaCochesEsperando.erase(listaCochesOciosos.begin()+posicion);
                             plazasLibres--;
-                            break;
+                            MPI_Send(&estado,1,MPI_INT,0,0,*(listaCoches[globalId]));
                         }
                     }
                 }
-                else {
-                    sleep(3000);
-                }
+                break;
             }
-        }
-    }
-void liberarPlaza(){
-
-}
-void monitor(){
-
-}
-bool isOcupado(){
-    return true;
-}
-void imprimirAscii(){
-
-}
-void imprimirCochesEsperando(){
-
-}
-void imprimirCochesOciosos(){
-
-}
-void freePlazas(){
-
+      }
 }
 
-void menu(){
 
-}
 
 int main(int argc, char **argv){
     int rank = 0;
@@ -322,7 +356,7 @@ int main(int argc, char **argv){
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    int *msg;
+    char *msg;
     int stop = 0;
 
     pthread_create(&threadCoche, NULL, threadCrearCoches, NULL);
